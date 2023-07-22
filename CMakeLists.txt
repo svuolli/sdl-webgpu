@@ -15,4 +15,5 @@ set_property(TARGET sdl2 PROPERTY
 set_property(TARGET sdl2 PROPERTY
     INTERFACE_LINK_LIBRARIES ${SDL2_LIBRARY})
 
+add_subdirectory(webgpu)
 add_subdirectory(demo)
