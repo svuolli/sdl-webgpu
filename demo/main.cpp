@@ -228,14 +228,92 @@ struct wgpu_app
     WGPUSwapChain wgpu_swap_chain = nullptr;
 };
 
-struct frame_renderer
+class frame_renderer
 {
+    public:
     frame_renderer(wgpu_app & app_instance) :
         app(app_instance)
-    {}
+    {
+        shader_module =
+            wgpuDeviceCreateShaderModule(app.wgpu_device, &shader_module_descriptor);
+
+        if(!shader_module)
+        {
+            throw std::runtime_error{"Shader module creation failed"};
+        }
+
+        if(!validate_shader_module(shader_module))
+        {
+            throw std::runtime_error{"Shader compilation failed"};
+        }
+
+        WGPUColorTargetState const color_target =
+        {
+            .nextInChain = nullptr,
+            .format = WGPUTextureFormat_BGRA8Unorm,
+            .blend = nullptr,
+            .writeMask = WGPUColorWriteMask_All
+        };
+
+        WGPUFragmentState const fragmet_state =
+        {
+            .nextInChain = nullptr,
+            .module = shader_module,
+            .entryPoint = "fs_main",
+            .constantCount = 0u,
+            .constants = nullptr,
+            .targetCount = 1,
+            .targets = &color_target
+        };
+
+        WGPURenderPipelineDescriptor const pipeline_descriptor =
+        {
+            .nextInChain = nullptr,
+            .label = "RenderPipelineCCW",
+            .layout = nullptr,
+            .vertex =
+            {
+                .nextInChain = nullptr,
+                .module = shader_module,
+                .entryPoint = "vs_main",
+                .constantCount = 0,
+                .constants = nullptr,
+                .bufferCount = 0,
+                .buffers = nullptr
+            },
+            .primitive =
+            {
+                .nextInChain = nullptr,
+                .topology = WGPUPrimitiveTopology_TriangleList,
+                .stripIndexFormat = WGPUIndexFormat_Undefined,
+                .frontFace = WGPUFrontFace_CCW,
+                .cullMode = WGPUCullMode_None
+            },
+            .depthStencil = nullptr,
+            .multisample =
+            {
+                .nextInChain = nullptr,
+                .count = 1,
+                .mask = ~std::uint32_t{0},
+                .alphaToCoverageEnabled = false
+            },
+            .fragment = &fragmet_state
+        };
+
+        pipeline_ccw = wgpuDeviceCreateRenderPipeline(
+            app.wgpu_device, &pipeline_descriptor);
+
+        if(!pipeline_ccw)
+        {
+            throw std::runtime_error{"RenderPipeline creation failed"};
+        }
+    }
 
     ~frame_renderer()
-    {}
+    {
+        wgpuRenderPipelineRelease(pipeline_ccw);
+        wgpuShaderModuleRelease(shader_module);
+    }
 
     void render(WGPUTextureView next_texture)
     {
@@ -244,9 +322,10 @@ struct frame_renderer
 
         WGPURenderPassEncoder render_pass = createRenderPassEncoder(encoder, next_texture);
 
-        // TODO: Add render commands
-
+        wgpuRenderPassEncoderSetPipeline(render_pass, pipeline_ccw);
+        wgpuRenderPassEncoderDraw(render_pass, 3, 1, 0, 0);
         wgpuRenderPassEncoderEnd(render_pass);
+
         WGPUCommandBuffer command_buffer =
             wgpuCommandEncoderFinish(encoder, &command_buffer_descriptor);
 
@@ -257,6 +336,7 @@ struct frame_renderer
         wgpuCommandEncoderRelease(encoder);
     }
 
+    private:
     WGPURenderPassEncoder createRenderPassEncoder(
         WGPUCommandEncoder encoder, WGPUTextureView target_view)
     {
@@ -285,6 +365,58 @@ struct frame_renderer
         return wgpuCommandEncoderBeginRenderPass(encoder, &render_pass_descriptor);
     }
 
+    static bool validate_shader_module(WGPUShaderModule module)
+    {
+        struct user_data_t
+        {
+            bool compilation_complete = false;
+            bool compilation_success = false;
+            std::mutex mutex;
+            std::condition_variable cv;
+        };
+
+        user_data_t user_data;
+
+        auto const shader_compile_callback = [](
+            WGPUCompilationInfoRequestStatus status,
+            WGPUCompilationInfo const * compilation_info,
+            void * p_user_data)
+        {
+            auto * user_data = reinterpret_cast<user_data_t *>(p_user_data);
+            std::unique_lock<std::mutex> lock{user_data->mutex};            
+
+            auto errors = std::size_t{0};
+            if(compilation_info)
+            {
+                for(auto i = std::size_t{0}; i < compilation_info->messageCount; ++i)
+                {
+                    auto const message = compilation_info->messages[i];
+                    if(message.type == WGPUCompilationMessageType_Error)
+                    {
+                        ++errors;
+                        std::cerr << "Shader compile error: " << message.message << '\n';
+                    }
+                }
+            }
+
+            user_data->compilation_success = 
+                (status == WGPUCompilationInfoRequestStatus_Success) &&
+                (errors == 0u);
+            user_data->compilation_complete = true;
+            lock.unlock();
+            user_data->cv.notify_all();
+        };
+
+        wgpuShaderModuleGetCompilationInfo(
+            module, shader_compile_callback, &user_data);
+        
+        std::unique_lock<std::mutex> lock{user_data.mutex};
+        user_data.cv.wait(
+            lock, [&user_data] { return user_data.compilation_complete; });
+
+        return user_data.compilation_success;
+    }
+
     static constexpr WGPUCommandEncoderDescriptor command_encoder_descriptor =
     {
         .nextInChain = nullptr,
@@ -299,7 +431,38 @@ struct frame_renderer
 
     static constexpr WGPUColor bg_color = {0.8, 0.2, 0.6, 1.0};
 
+    static constexpr WGPUShaderModuleWGSLDescriptor shader_code_descriptor =
+    {
+        .chain =
+        { 
+            .next = nullptr,
+            .sType = WGPUSType_ShaderModuleWGSLDescriptor
+        },
+        .code = R"WGSL(
+var<private> pos: array<vec2f, 3> = array<vec2f, 3>(
+    vec2f(-0.5, -0.5), vec2f(0.5, -0.5), vec2f(0.0, 0.5f));
+
+@vertex
+fn vs_main(@builtin(vertex_index) in_vertex_index: u32) -> @builtin(position) vec4f {
+    return vec4f(pos[in_vertex_index], 0.0, 1.0);
+}
+
+@fragment
+fn fs_main() -> @location(0) vec4f {
+    return vec4f(0.0, 0.4, 1.0, 1.0);
+}
+        )WGSL"
+    };
+
+    static constexpr WGPUShaderModuleDescriptor shader_module_descriptor =
+    {
+        .nextInChain = &shader_code_descriptor.chain,
+        .label = "ShaderModule"
+    };
+
     wgpu_app & app;
+    WGPUShaderModule shader_module = nullptr;
+    WGPURenderPipeline pipeline_ccw = nullptr;
 };
 
 int main(int argc, char const * argv[])
