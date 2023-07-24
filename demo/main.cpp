@@ -3,6 +3,7 @@
 #include <webgpu/webgpu.h>
 #include <SDL2/SDL.h>
 
+#include <array>
 #include <condition_variable>
 #include <mutex>
 #include <iostream>
@@ -232,17 +233,17 @@ class frame_renderer
 {
     public:
     frame_renderer(wgpu_app & app_instance) :
-        app(app_instance)
+        m_app(app_instance)
     {
-        shader_module =
-            wgpuDeviceCreateShaderModule(app.wgpu_device, &shader_module_descriptor);
+        m_shader_module =
+            wgpuDeviceCreateShaderModule(m_app.wgpu_device, &shader_module_descriptor);
 
-        if(!shader_module)
+        if(!m_shader_module)
         {
             throw std::runtime_error{"Shader module creation failed"};
         }
 
-        if(!validate_shader_module(shader_module))
+        if(!validate_shader_module(m_shader_module))
         {
             throw std::runtime_error{"Shader compilation failed"};
         }
@@ -258,12 +259,27 @@ class frame_renderer
         WGPUFragmentState const fragmet_state =
         {
             .nextInChain = nullptr,
-            .module = shader_module,
+            .module = m_shader_module,
             .entryPoint = "fs_main",
             .constantCount = 0u,
             .constants = nullptr,
             .targetCount = 1,
             .targets = &color_target
+        };
+
+        WGPUVertexAttribute const vertex_attrib =
+        {
+            .format = WGPUVertexFormat_Float32x2,
+            .offset = 0,
+            .shaderLocation = 0
+        };
+
+        WGPUVertexBufferLayout const buffer_layout =
+        {
+            .arrayStride = 2 * sizeof(float),
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .attributeCount = 1,
+            .attributes = &vertex_attrib
         };
 
         WGPURenderPipelineDescriptor const pipeline_descriptor =
@@ -274,12 +290,12 @@ class frame_renderer
             .vertex =
             {
                 .nextInChain = nullptr,
-                .module = shader_module,
+                .module = m_shader_module,
                 .entryPoint = "vs_main",
                 .constantCount = 0,
                 .constants = nullptr,
-                .bufferCount = 0,
-                .buffers = nullptr
+                .bufferCount = 1,
+                .buffers = &buffer_layout
             },
             .primitive =
             {
@@ -300,36 +316,54 @@ class frame_renderer
             .fragment = &fragmet_state
         };
 
-        pipeline_ccw = wgpuDeviceCreateRenderPipeline(
-            app.wgpu_device, &pipeline_descriptor);
+        m_ccw_pipeline = wgpuDeviceCreateRenderPipeline(
+            m_app.wgpu_device, &pipeline_descriptor);
 
-        if(!pipeline_ccw)
+        if(!m_ccw_pipeline)
         {
             throw std::runtime_error{"RenderPipeline creation failed"};
         }
+
+        m_vertices = wgpuDeviceCreateBuffer(m_app.wgpu_device, &vertex_buffer_descriptor);
+
+        if(!m_vertices)
+        {
+            throw std::runtime_error{"Buffer creation failed"};
+        }
+
+        wgpuQueueWriteBuffer(
+            m_app.wgpu_queue,
+            m_vertices,
+            0,
+            vertex_data.data(),
+            vertex_data.size() * sizeof(float));
     }
 
     ~frame_renderer()
     {
-        wgpuRenderPipelineRelease(pipeline_ccw);
-        wgpuShaderModuleRelease(shader_module);
+        wgpuBufferRelease(m_vertices);
+        wgpuRenderPipelineRelease(m_ccw_pipeline);
+        wgpuShaderModuleRelease(m_shader_module);
     }
 
     void render(WGPUTextureView next_texture)
     {
         WGPUCommandEncoder encoder =
-            wgpuDeviceCreateCommandEncoder(app.wgpu_device, &command_encoder_descriptor);
+            wgpuDeviceCreateCommandEncoder(m_app.wgpu_device, &command_encoder_descriptor);
 
-        WGPURenderPassEncoder render_pass = createRenderPassEncoder(encoder, next_texture);
+        WGPURenderPassEncoder render_pass =
+            createRenderPassEncoder(encoder, next_texture);
 
-        wgpuRenderPassEncoderSetPipeline(render_pass, pipeline_ccw);
+        wgpuRenderPassEncoderSetPipeline(render_pass, m_ccw_pipeline);
+        wgpuRenderPassEncoderSetVertexBuffer(
+            render_pass, 0, m_vertices, 0, vertex_data.size() * sizeof(float));
         wgpuRenderPassEncoderDraw(render_pass, 3, 1, 0, 0);
         wgpuRenderPassEncoderEnd(render_pass);
 
         WGPUCommandBuffer command_buffer =
             wgpuCommandEncoderFinish(encoder, &command_buffer_descriptor);
 
-        wgpuQueueSubmit(app.wgpu_queue, 1, &command_buffer);
+        wgpuQueueSubmit(m_app.wgpu_queue, 1, &command_buffer);
 
         wgpuCommandBufferRelease(command_buffer);
         wgpuRenderPassEncoderRelease(render_pass);
@@ -429,7 +463,8 @@ class frame_renderer
         .label = "CommandBuffer"
     };
 
-    static constexpr WGPUColor bg_color = {0.8, 0.2, 0.6, 1.0};
+    static constexpr WGPUColor bg_color =
+        {.06274509803921568627, .06274509803921568627, .19215686274509803921, 1.0};
 
     static constexpr WGPUShaderModuleWGSLDescriptor shader_code_descriptor =
     {
@@ -439,12 +474,9 @@ class frame_renderer
             .sType = WGPUSType_ShaderModuleWGSLDescriptor
         },
         .code = R"WGSL(
-var<private> pos: array<vec2f, 3> = array<vec2f, 3>(
-    vec2f(-0.5, -0.5), vec2f(0.5, -0.5), vec2f(0.0, 0.5f));
-
 @vertex
-fn vs_main(@builtin(vertex_index) in_vertex_index: u32) -> @builtin(position) vec4f {
-    return vec4f(pos[in_vertex_index], 0.0, 1.0);
+fn vs_main(@location(0) vertex_pos: vec2f) -> @builtin(position) vec4f {
+    return vec4f(vertex_pos, 0.0, 1.0);
 }
 
 @fragment
@@ -460,9 +492,26 @@ fn fs_main() -> @location(0) vec4f {
         .label = "ShaderModule"
     };
 
-    wgpu_app & app;
-    WGPUShaderModule shader_module = nullptr;
-    WGPURenderPipeline pipeline_ccw = nullptr;
+    static constexpr std::array<float, 3*2> vertex_data =
+    {
+        -0.5f, -0.5f,
+        0.5f, -0.5f,
+        0.0f, 0.5f,
+    };
+
+    static constexpr WGPUBufferDescriptor vertex_buffer_descriptor =
+    {
+        .nextInChain = nullptr,
+        .label = "VertexBuffer",
+        .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
+        .size = vertex_data.size() * sizeof(float),
+        .mappedAtCreation = false
+    };
+
+    wgpu_app & m_app;
+    WGPUShaderModule m_shader_module = nullptr;
+    WGPURenderPipeline m_ccw_pipeline = nullptr;
+    WGPUBuffer m_vertices;
 };
 
 int main(int argc, char const * argv[])
