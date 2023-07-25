@@ -2,14 +2,84 @@
 
 #include <webgpu/webgpu.h>
 #include <SDL2/SDL.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/transform.hpp>
 
 #include <array>
 #include <condition_variable>
-#include <mutex>
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <stdexcept>
 #include <thread>
+#include <vector>
+
+namespace
+{
+static constexpr WGPUColor int_to_wgpu_color(std::uint32_t c)
+{
+    auto const conv = [c](std::size_t comp)
+    {
+        return ((c >> (8*comp)) & 0xFF) / 255.0f;
+    };
+
+    return { conv(2), conv(1), conv(0), conv(3) };
+}
+
+static constexpr glm::vec4 int_to_glm_color(std::uint32_t c)
+{
+    auto const conv = [c](std::size_t comp)
+    {
+        return ((c >> (8*comp)) & 0xFF) / 255.0f;
+    };
+
+    return { conv(2), conv(1), conv(0), conv(3) };
+}
+
+std::ostream & operator<<(std::ostream & stream, WGPULimits const & limits)
+{
+#define WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(item) (stream << " - " #item << ": " << limits.item << '\n')
+
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxTextureDimension1D);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxTextureDimension2D);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxTextureDimension3D);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxTextureArrayLayers);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxBindGroups);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxBindGroupsPlusVertexBuffers);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxBindingsPerBindGroup);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxDynamicUniformBuffersPerPipelineLayout);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxDynamicStorageBuffersPerPipelineLayout);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxSampledTexturesPerShaderStage);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxSamplersPerShaderStage);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxStorageBuffersPerShaderStage);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxStorageTexturesPerShaderStage);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxUniformBuffersPerShaderStage);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxUniformBufferBindingSize);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxStorageBufferBindingSize);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(minUniformBufferOffsetAlignment);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(minStorageBufferOffsetAlignment);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxVertexBuffers);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxBufferSize);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxVertexAttributes);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxVertexBufferArrayStride);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxInterStageShaderComponents);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxInterStageShaderVariables);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxColorAttachments);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxColorAttachmentBytesPerSample);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxComputeWorkgroupStorageSize);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxComputeInvocationsPerWorkgroup);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxComputeWorkgroupSizeX);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxComputeWorkgroupSizeY);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxComputeWorkgroupSizeZ);
+    WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM(maxComputeWorkgroupsPerDimension);
+
+#undef WEBGPU_SDL_STREAM_ONE_LIMIT_ITEM
+
+    return stream;
+}
+
+} /* namespace */
 
 struct wgpu_app
 {
@@ -69,7 +139,7 @@ struct wgpu_app
             .label = "Device",
             .requiredFeaturesCount = 0u,
             .requiredFeatures = nullptr,
-            .requiredLimits = nullptr,
+            .requiredLimits = &required_device_limits,
             .defaultQueue = { .nextInChain = nullptr, .label = "Queue" },
             .deviceLostCallback = nullptr,
             .deviceLostUserdata = nullptr
@@ -124,6 +194,11 @@ struct wgpu_app
 
     wgpu_app & operator=(wgpu_app const &) = delete;
     wgpu_app & operator=(wgpu_app &&) = delete;
+
+    static constexpr float aspect_ratio()
+    {
+        return static_cast<float>(width) / static_cast<float>(height);
+    }
 
     static void wgpu_error_callback(
         WGPUErrorType type, char const * message, void * user_data)
@@ -217,6 +292,47 @@ struct wgpu_app
         return user_data.device;
     }
 
+    static constexpr auto uniform_buffer_offset_alignment = 256u;
+    static constexpr WGPURequiredLimits required_device_limits
+    {
+        .nextInChain = nullptr,
+        .limits =
+        {
+            .maxTextureDimension1D = 0,
+            .maxTextureDimension2D = 0,
+            .maxTextureDimension3D = 0,
+            .maxTextureArrayLayers = 0,
+            .maxBindGroups = 1,
+            .maxBindGroupsPlusVertexBuffers = 4,
+            .maxBindingsPerBindGroup = 4,
+            .maxDynamicUniformBuffersPerPipelineLayout = 2,
+            .maxDynamicStorageBuffersPerPipelineLayout = 0,
+            .maxSampledTexturesPerShaderStage = 0,
+            .maxSamplersPerShaderStage = 0,
+            .maxStorageBuffersPerShaderStage = 0,
+            .maxStorageTexturesPerShaderStage = 0,
+            .maxUniformBuffersPerShaderStage = 4,
+            .maxUniformBufferBindingSize = 4096,
+            .maxStorageBufferBindingSize = 0,
+            .minUniformBufferOffsetAlignment = uniform_buffer_offset_alignment,
+            .minStorageBufferOffsetAlignment = 1024,
+            .maxVertexBuffers = 4,
+            .maxBufferSize = 1024*1024,
+            .maxVertexAttributes = 4,
+            .maxVertexBufferArrayStride = 512,
+            .maxInterStageShaderComponents = 16,
+            .maxInterStageShaderVariables = 8,
+            .maxColorAttachments = 1,
+            .maxColorAttachmentBytesPerSample = 16,
+            .maxComputeWorkgroupStorageSize = 0,
+            .maxComputeInvocationsPerWorkgroup = 0,
+            .maxComputeWorkgroupSizeX = 0,
+            .maxComputeWorkgroupSizeY = 0,
+            .maxComputeWorkgroupSizeZ = 0,
+            .maxComputeWorkgroupsPerDimension = 0,
+        }
+    };
+
     static constexpr int width = 800;
     static constexpr int height = 600;
 
@@ -227,7 +343,7 @@ struct wgpu_app
     WGPUDevice wgpu_device = nullptr;
     WGPUQueue wgpu_queue = nullptr;
     WGPUSwapChain wgpu_swap_chain = nullptr;
-};
+}; /* struct wgpu_app */
 
 class frame_renderer
 {
@@ -269,24 +385,47 @@ class frame_renderer
 
         WGPUVertexAttribute const vertex_attrib =
         {
-            .format = WGPUVertexFormat_Float32x2,
+            .format = WGPUVertexFormat_Float32x3,
             .offset = 0,
             .shaderLocation = 0
         };
 
         WGPUVertexBufferLayout const buffer_layout =
         {
-            .arrayStride = 2 * sizeof(float),
+            .arrayStride = 3 * sizeof(float),
             .stepMode = WGPUVertexStepMode_Vertex,
             .attributeCount = 1,
             .attributes = &vertex_attrib
         };
 
+        WGPUBindGroupLayoutDescriptor const bind_group_layout_descriptor =
+        {
+            .nextInChain = nullptr,
+            .label = "BindGrouLayout",
+            .entryCount = binding_layout_entries.size(),
+            .entries = binding_layout_entries.data()
+        };
+
+        WGPUBindGroupLayout bind_group_layout =
+            wgpuDeviceCreateBindGroupLayout(
+                m_app.wgpu_device, &bind_group_layout_descriptor);
+
+        WGPUPipelineLayoutDescriptor const layout_descriptor =
+        {
+            .nextInChain = nullptr,
+            .label = "PipelineLayout",
+            .bindGroupLayoutCount = 1,
+            .bindGroupLayouts = &bind_group_layout
+        };
+
+        WGPUPipelineLayout pipeline_layout =
+            wgpuDeviceCreatePipelineLayout(m_app.wgpu_device, &layout_descriptor);
+
         WGPURenderPipelineDescriptor const pipeline_descriptor =
         {
             .nextInChain = nullptr,
             .label = "RenderPipelineCCW",
-            .layout = nullptr,
+            .layout = pipeline_layout,
             .vertex =
             {
                 .nextInChain = nullptr,
@@ -303,7 +442,7 @@ class frame_renderer
                 .topology = WGPUPrimitiveTopology_TriangleList,
                 .stripIndexFormat = WGPUIndexFormat_Undefined,
                 .frontFace = WGPUFrontFace_CCW,
-                .cullMode = WGPUCullMode_None
+                .cullMode = WGPUCullMode_Front
             },
             .depthStencil = nullptr,
             .multisample =
@@ -318,6 +457,7 @@ class frame_renderer
 
         m_ccw_pipeline = wgpuDeviceCreateRenderPipeline(
             m_app.wgpu_device, &pipeline_descriptor);
+        wgpuPipelineLayoutRelease(pipeline_layout);
 
         if(!m_ccw_pipeline)
         {
@@ -337,27 +477,151 @@ class frame_renderer
             0,
             vertex_data.data(),
             vertex_data.size() * sizeof(float));
+
+        m_cube_vertices = create_vertex_buffer(cube_vertex_data, "CubeVertexBuffer");
+        m_hedron_vertices = create_vertex_buffer(hedron_vertex_data, "HedronVertexBuffer");
+        m_spikes_vertices = create_vertex_buffer(spikes_vertex_data, "SpikesVertexBuffer");
+        m_tile1_vertices = create_vertex_buffer(tile1_vertex_data, "Tile1VertexBuffer");
+        m_tile2_vertices = create_vertex_buffer(tile2_vertex_data, "Tile2VertexBuffer");
+        m_indices1 = create_index_buffer(indices1_data, "IndexBuffer1");
+        m_indices2 = create_index_buffer(indices2_data, "IndexBuffer2");
+        m_transformation_uniform = create_uniform_buffer(sizeof(glm::mat4), "TransformationUniform");
+        m_color_uniform = create_uniform_buffer(
+            fill_colors.size() * wgpu_app::uniform_buffer_offset_alignment, "ColorUniform");
+
+        for(auto i = std::size_t{0}; i != fill_colors.size(); ++i)
+        {
+            auto const & color = fill_colors[i];
+            wgpuQueueWriteBuffer(
+                m_app.wgpu_queue,
+                m_color_uniform,
+                i*wgpu_app::uniform_buffer_offset_alignment,
+                &color, sizeof(color));
+        }
+
+        wgpuQueueWriteBuffer(
+            m_app.wgpu_queue,
+            m_color_uniform,
+            0,
+            fill_colors.data(),
+            fill_colors.size() * sizeof(WGPUColor));
+
+        std::array const bind_group_entries
+        {
+            WGPUBindGroupEntry
+            {
+                .nextInChain = nullptr,
+                .binding = 0,
+                .buffer = m_transformation_uniform,
+                .offset = 0,
+                .size = sizeof(glm::mat4),
+                .sampler = nullptr,
+                .textureView = nullptr
+            },
+            WGPUBindGroupEntry
+            {
+                .nextInChain = nullptr,
+                .binding = 1,
+                .buffer = m_color_uniform,
+                .offset = 0,
+                .size = sizeof(WGPUColor),
+                .sampler = nullptr,
+                .textureView = nullptr
+            }
+        };
+
+        WGPUBindGroupDescriptor const bind_group_descriptor =
+        {
+            .nextInChain = nullptr,
+            .label = "BindGroup",
+            .layout = bind_group_layout,
+            .entryCount = bind_group_entries.size(),
+            .entries = bind_group_entries.data()
+        };
+
+        m_bind_group = wgpuDeviceCreateBindGroup(
+            m_app.wgpu_device, &bind_group_descriptor);
+
+        m_projection_matrix =
+            glm::perspective(45.0f, wgpu_app::aspect_ratio(), 1.0f, 50.0f);
+
     }
 
     ~frame_renderer()
     {
+        wgpuBufferRelease(m_color_uniform);
+        wgpuBufferRelease(m_transformation_uniform);
+        wgpuBufferRelease(m_indices1);
+        wgpuBufferRelease(m_tile2_vertices);
+        wgpuBufferRelease(m_tile1_vertices);
+        wgpuBufferRelease(m_spikes_vertices);
+        wgpuBufferRelease(m_hedron_vertices);
+        wgpuBufferRelease(m_cube_vertices);
+
         wgpuBufferRelease(m_vertices);
         wgpuRenderPipelineRelease(m_ccw_pipeline);
         wgpuShaderModuleRelease(m_shader_module);
     }
 
-    void render(WGPUTextureView next_texture)
+    void render(WGPUTextureView next_texture, std::uint32_t time_point)
     {
-        WGPUCommandEncoder encoder =
-            wgpuDeviceCreateCommandEncoder(m_app.wgpu_device, &command_encoder_descriptor);
+        float rc = 3.0f * glm::cos(time_point * 0.001);
+        float sc = 2.5f * glm::sin(time_point * 0.001);
+
+        glm::mat4 transform =
+            m_projection_matrix *
+            glm::translate(glm::vec3{0.0f, 0.0f, -8.0f}) *
+            glm::rotate(rc, glm::vec3{1.0f, 0.0f, 0.0f}) *
+            glm::rotate(rc, glm::vec3{0.0f, 1.0f, 0.0f});
+
+        wgpuQueueWriteBuffer(
+            m_app.wgpu_queue,
+            m_transformation_uniform,
+            0,
+            &transform,
+            sizeof(transform));
+
+        WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(
+            m_app.wgpu_device, &command_encoder_descriptor);
 
         WGPURenderPassEncoder render_pass =
             createRenderPassEncoder(encoder, next_texture);
+        wgpuRenderPassEncoderSetVertexBuffer(
+            render_pass, 0, m_hedron_vertices,
+            0, hedron_vertex_data.size() * sizeof(glm::vec3));
 
         wgpuRenderPassEncoderSetPipeline(render_pass, m_ccw_pipeline);
-        wgpuRenderPassEncoderSetVertexBuffer(
-            render_pass, 0, m_vertices, 0, vertex_data.size() * sizeof(float));
-        wgpuRenderPassEncoderDraw(render_pass, 3, 1, 0, 0);
+
+        std::uint32_t color_offset =
+            wgpu_app::uniform_buffer_offset_alignment * 2;
+        wgpuRenderPassEncoderSetBindGroup(
+            render_pass, 0, m_bind_group, 1, &color_offset);
+
+        wgpuRenderPassEncoderSetIndexBuffer(
+            render_pass,
+            m_indices1,
+            WGPUIndexFormat_Uint32,
+            0, indices1_data.size() * sizeof(std::uint32_t));
+
+        wgpuRenderPassEncoderDrawIndexed(
+            render_pass, indices1_data.size(), 1, 0, 0, 0);
+
+        // 2nd draw
+        color_offset =
+            wgpu_app::uniform_buffer_offset_alignment * 1;
+        wgpuRenderPassEncoderSetBindGroup(
+            render_pass, 0, m_bind_group, 1, &color_offset);
+
+        wgpuRenderPassEncoderSetIndexBuffer(
+            render_pass,
+            m_indices2,
+            WGPUIndexFormat_Uint32,
+            0, indices2_data.size() * sizeof(std::uint32_t));
+
+        wgpuRenderPassEncoderDrawIndexed(
+            render_pass, indices2_data.size(), 1, 0, 0, 0);
+        // 2nd draw
+        
         wgpuRenderPassEncoderEnd(render_pass);
 
         WGPUCommandBuffer command_buffer =
@@ -451,6 +715,72 @@ class frame_renderer
         return user_data.compilation_success;
     }
 
+    template <typename Container>
+    WGPUBuffer create_vertex_buffer(Container const & data, char const * label)
+    {
+        auto const size = data.size() * sizeof(typename Container::value_type);
+        WGPUBufferDescriptor const descriptor =
+        {
+            .nextInChain = nullptr,
+            .label = label,
+            .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
+            .size = size,
+            .mappedAtCreation = false
+        };
+
+        WGPUBuffer buffer =
+            wgpuDeviceCreateBuffer(m_app.wgpu_device, &descriptor);
+
+        wgpuQueueWriteBuffer(
+            m_app.wgpu_queue,
+            buffer,
+            0,
+            data.data(),
+            data.size() * sizeof(typename Container::value_type));
+
+        return buffer;
+    }
+
+    template <typename Container>
+    WGPUBuffer create_index_buffer(Container const & data, char const * label)
+    {
+        auto const size = data.size() * sizeof(typename Container::value_type);
+        WGPUBufferDescriptor const descriptor =
+        {
+            .nextInChain = nullptr,
+            .label = label,
+            .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index,
+            .size = size,
+            .mappedAtCreation = false
+        };
+
+        WGPUBuffer buffer =
+            wgpuDeviceCreateBuffer(m_app.wgpu_device, &descriptor);
+
+        wgpuQueueWriteBuffer(
+            m_app.wgpu_queue,
+            buffer,
+            0,
+            data.data(),
+            data.size() * sizeof(typename Container::value_type));
+
+        return buffer;
+    }
+
+    WGPUBuffer create_uniform_buffer(std::size_t size, char const * label)
+    {
+        WGPUBufferDescriptor const descriptor =
+        {
+            .nextInChain = nullptr,
+            .label = label,
+            .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+            .size = size,
+            .mappedAtCreation = false
+        };
+
+        return wgpuDeviceCreateBuffer(m_app.wgpu_device, &descriptor);
+    }
+
     static constexpr WGPUCommandEncoderDescriptor command_encoder_descriptor =
     {
         .nextInChain = nullptr,
@@ -463,10 +793,15 @@ class frame_renderer
         .label = "CommandBuffer"
     };
 
-    static constexpr WGPUColor bg_color =
-        {.06274509803921568627, .06274509803921568627, .19215686274509803921, 1.0};
+    static constexpr WGPUColor bg_color = int_to_wgpu_color(0xFF101031);
+    static constexpr std::array fill_colors
+    {
+        int_to_glm_color(0xFF420042),
+        int_to_glm_color(0xFF631063),
+        int_to_glm_color(0xFFFFEFEF),
+    };
 
-    static constexpr WGPUShaderModuleWGSLDescriptor shader_code_descriptor =
+    static constexpr WGPUShaderModuleWGSLDescriptor mesh_shader_code_descriptor =
     {
         .chain =
         { 
@@ -474,22 +809,95 @@ class frame_renderer
             .sType = WGPUSType_ShaderModuleWGSLDescriptor
         },
         .code = R"WGSL(
+@group(0) @binding(0) var<uniform> projection: mat4x4f;
+@group(0) @binding(1) var<uniform> color: vec4f;
+
 @vertex
-fn vs_main(@location(0) vertex_pos: vec2f) -> @builtin(position) vec4f {
-    return vec4f(vertex_pos, 0.0, 1.0);
+fn vs_main(@location(0) in: vec3f) -> @builtin(position) vec4f
+{
+    return projection * vec4f(in, 1.0);
 }
 
 @fragment
-fn fs_main() -> @location(0) vec4f {
-    return vec4f(0.0, 0.4, 1.0, 1.0);
+fn fs_main() -> @location(0) vec4f
+{
+    return color;
 }
         )WGSL"
     };
 
     static constexpr WGPUShaderModuleDescriptor shader_module_descriptor =
     {
-        .nextInChain = &shader_code_descriptor.chain,
+        .nextInChain = &mesh_shader_code_descriptor.chain,
         .label = "ShaderModule"
+    };
+
+    static constexpr std::array binding_layout_entries
+    {
+        WGPUBindGroupLayoutEntry
+        {
+            .nextInChain = nullptr,
+            .binding = 0,
+            .visibility = WGPUShaderStage_Vertex,
+            .buffer = 
+            {
+                .nextInChain = nullptr,
+                .type = WGPUBufferBindingType_Uniform,
+                .hasDynamicOffset = false,
+                .minBindingSize = sizeof(glm::mat4)
+            },
+            .sampler =
+            {
+                .nextInChain = nullptr,
+                .type = WGPUSamplerBindingType_Undefined
+            },
+            .texture =
+            {
+                .nextInChain = nullptr,
+                .sampleType = WGPUTextureSampleType_Undefined,
+                .viewDimension = WGPUTextureViewDimension_Undefined,
+                .multisampled = false
+            },
+            .storageTexture =
+            {
+                .nextInChain = nullptr,
+                .access = WGPUStorageTextureAccess_Undefined,
+                .format = WGPUTextureFormat_Undefined,
+                .viewDimension = WGPUTextureViewDimension_Undefined
+            }
+        },
+        WGPUBindGroupLayoutEntry
+        {
+            .nextInChain = nullptr,
+            .binding = 1,
+            .visibility = WGPUShaderStage_Fragment,
+            .buffer = 
+            {
+                .nextInChain = nullptr,
+                .type = WGPUBufferBindingType_Uniform,
+                .hasDynamicOffset = true,
+                .minBindingSize = sizeof(WGPUColor)
+            },
+            .sampler =
+            {
+                .nextInChain = nullptr,
+                .type = WGPUSamplerBindingType_Undefined
+            },
+            .texture =
+            {
+                .nextInChain = nullptr,
+                .sampleType = WGPUTextureSampleType_Undefined,
+                .viewDimension = WGPUTextureViewDimension_Undefined,
+                .multisampled = false
+            },
+            .storageTexture =
+            {
+                .nextInChain = nullptr,
+                .access = WGPUStorageTextureAccess_Undefined,
+                .format = WGPUTextureFormat_Undefined,
+                .viewDimension = WGPUTextureViewDimension_Undefined
+            }
+        }
     };
 
     static constexpr std::array<float, 3*2> vertex_data =
@@ -498,6 +906,139 @@ fn fs_main() -> @location(0) vec4f {
         0.5f, -0.5f,
         0.0f, 0.5f,
     };
+
+    static constexpr std::array cube_vertex_data
+    {
+        glm::vec3{2.0f, 2.0f, -2.0f},
+        glm::vec3{2.0f, -2.0f, -2.0f},
+        glm::vec3{-2.0f, -2.0f, -2.0f},
+        glm::vec3{-2.0f, 2.0f, -2.0f},
+        glm::vec3{2.0f, 2.0f, 2.0f},
+        glm::vec3{2.0f, -2.0f, 2.0f},
+        glm::vec3{-2.0f, -2.0f, 2.0f},
+        glm::vec3{-2.0f, 2.0f, 2.0f},
+        glm::vec3{2.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 2.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, 2.0f},
+        glm::vec3{-2.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, -2.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, -2.0f}
+    };
+
+    static constexpr std::array hedron_vertex_data
+    {
+        glm::vec3{2.0f, 2.0f, -2.0f},
+        glm::vec3{2.0f, -2.0f, -2.0f},
+        glm::vec3{-2.0f, -2.0f, -2.0f},
+        glm::vec3{-2.0f, 2.0f, -2.0f},
+        glm::vec3{2.0f, 2.0f, 2.0f},
+        glm::vec3{2.0f, -2.0f, 2.0f},
+        glm::vec3{-2.0f, -2.0f, 2.0f},
+        glm::vec3{-2.0f, 2.0f, 2.0f},
+        glm::vec3{3.5f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 3.5f, 0.0f},
+        glm::vec3{0.0f, 0.0f, 3.5f},
+        glm::vec3{-3.5f, 0.0f, 0.0f},
+        glm::vec3{0.0f, -3.5f, 0.0f},
+        glm::vec3{0.0f, 0.0f, -3.5f}
+    };
+    
+    static constexpr std::array spikes_vertex_data
+    {
+        glm::vec3{1.0f, 1.0f, -1.0f},
+        glm::vec3{1.0f, -1.0f, -1.0f},
+        glm::vec3{-1.0f, -1.0f, -1.0f},
+        glm::vec3{-1.0f, 1.0f, -1.0f},
+        glm::vec3{1.0f, 1.0f, 1.0f},
+        glm::vec3{1.0f, -1.0f, 1.0f},
+        glm::vec3{-1.0f, -1.0f, 1.0f},
+        glm::vec3{-1.0f, 1.0f, 1.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, 4.5f},
+        glm::vec3{-1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, -1.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, -4.5f}
+    };
+    
+    static constexpr std::array tile1_vertex_data
+    {
+        glm::vec3{2.0f, 2.0f, -0.5f},
+        glm::vec3{2.0f, -2.0f, -0.5f},
+        glm::vec3{-2.0f, -2.0f, -0.5f},
+        glm::vec3{-2.0f, 2.0f, -0.5f},
+        glm::vec3{2.0f, 2.0f, 0.5f},
+        glm::vec3{2.0f, -2.0f, 0.5f},
+        glm::vec3{-2.0f, -2.0f, 0.5f},
+        glm::vec3{-2.0f, 2.0f, 0.5f},
+        glm::vec3{2.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 2.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, 0.5f},
+        glm::vec3{-2.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, -2.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, -0.5f}
+    };
+
+    static constexpr std::array tile2_vertex_data
+    {
+        glm::vec3{2.0f, 2.0f, -0.5f},
+        glm::vec3{2.0f, -2.0f, -0.5f},
+        glm::vec3{-2.0f, -2.0f, -0.5f},
+        glm::vec3{-2.0f, 2.0f, -0.5f},
+        glm::vec3{2.0f, 2.0f, 0.5f},
+        glm::vec3{2.0f, -2.0f, 0.5f},
+        glm::vec3{-2.0f, -2.0f, 0.5f},
+        glm::vec3{-2.0f, 2.0f, 0.5f},
+        glm::vec3{2.8f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 2.8f, 0.0f},
+        glm::vec3{0.0f, 0.0f, 0.5f},
+        glm::vec3{-2.8f, 0.0f, 0.0f},
+        glm::vec3{0.0f, -2.8f, 0.0f},
+        glm::vec3{0.0f, 0.0f, -0.5f}
+    };
+
+    static constexpr std::array indices1_data
+    {
+        13u, 3u, 0u,
+        13u, 1u, 2u,
+
+        10u, 4u, 7u,
+        10u, 6u, 5u,
+
+        12u, 1u, 5u,
+        12u, 6u, 2u,
+
+        9u, 3u, 7u,
+        9u, 4u, 0u,
+
+        8u, 1u, 0u,
+        8u, 4u, 5u,
+
+        11u, 6u, 7u,
+        11u, 3u, 2u
+    };
+
+    static constexpr std::array indices2_data
+    {
+      13, 0, 1,
+      13, 2, 3,
+      
+      10, 7, 6,
+      10, 5, 4,
+
+      12, 5, 6,
+      12, 2, 1,
+
+      9, 7, 4,
+      9, 0, 3,
+
+      8, 0, 4,
+      8, 5, 1,
+
+      11, 7, 3,
+      11, 2, 6
+    };
+
 
     static constexpr WGPUBufferDescriptor vertex_buffer_descriptor =
     {
@@ -509,16 +1050,73 @@ fn fs_main() -> @location(0) vec4f {
     };
 
     wgpu_app & m_app;
+    glm::mat4 m_projection_matrix;
     WGPUShaderModule m_shader_module = nullptr;
     WGPURenderPipeline m_ccw_pipeline = nullptr;
     WGPUBuffer m_vertices;
-};
+
+    WGPUBuffer m_cube_vertices;
+    WGPUBuffer m_hedron_vertices;
+    WGPUBuffer m_spikes_vertices;
+    WGPUBuffer m_tile1_vertices;
+    WGPUBuffer m_tile2_vertices;
+    WGPUBuffer m_indices1;
+    WGPUBuffer m_indices2;
+    WGPUBuffer m_transformation_uniform;
+    WGPUBuffer m_color_uniform;
+    WGPUBindGroup m_bind_group;
+}; /* class frame_renderer */
+
+void print_wgpu_info(wgpu_app const & app)
+{
+    WGPUAdapterProperties properties
+    {
+        .nextInChain = nullptr
+    };
+
+    wgpuAdapterGetProperties(app.wgpu_adapter, &properties);
+    
+    std::cout << "Adapter properties:\n";
+    std::cout << " - vendorID: " << properties.vendorID << '\n';
+    std::cout << " - vendorName: " << properties.vendorName << '\n';
+    std::cout << " - architecture: " << properties.architecture << '\n';
+    std::cout << " - deviceId: " << properties.deviceID << '\n';
+    std::cout << " - name: " << properties.name << '\n';
+    std::cout << " - driverDescription: " << properties.driverDescription << '\n';
+    std::cout << " - adapterType: " << properties.adapterType << '\n';
+    std::cout << " - backendType: " << properties.backendType << '\n';
+    std::cout << " - compatibilityMode: " << properties.compatibilityMode << '\n';
+
+    WGPUSupportedLimits supported_limits;
+    if(wgpuAdapterGetLimits(app.wgpu_adapter, &supported_limits))
+    {
+        std::cout << "Supported limits:\n" << supported_limits.limits;
+    }
+    else
+    {
+        std::cerr << "Can't retreive supported limits from adapter\n";
+    }
+
+    auto const feature_count = wgpuAdapterEnumerateFeatures(
+        app.wgpu_adapter, nullptr);
+    auto features = std::vector<WGPUFeatureName>{feature_count};
+    wgpuAdapterEnumerateFeatures(app.wgpu_adapter, features.data());
+
+    std::cout << "Features:\n";
+    for(auto const feature: features)
+    {
+        std::cout << " - " << feature << '\n';
+    }
+}
 
 int main(int argc, char const * argv[])
 {
     try
     {
         wgpu_app app;
+
+        print_wgpu_info(app);
+
         frame_renderer renderer(app);
 
         auto done = false;
@@ -551,7 +1149,7 @@ int main(int argc, char const * argv[])
                 continue;
             }
 
-            renderer.render(next_texture);
+            renderer.render(next_texture, elapsed_time);
 
             wgpuTextureViewRelease(next_texture);
             wgpuSwapChainPresent(app.wgpu_swap_chain);
