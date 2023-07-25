@@ -909,93 +909,94 @@ fn fs_main() -> @location(0) vec4f
 
     static constexpr std::array cube_vertex_data
     {
-        glm::vec3{2.0f, 2.0f, -2.0f},
         glm::vec3{2.0f, -2.0f, -2.0f},
-        glm::vec3{-2.0f, -2.0f, -2.0f},
+        glm::vec3{2.0f, 2.0f, -2.0f},
         glm::vec3{-2.0f, 2.0f, -2.0f},
-        glm::vec3{2.0f, 2.0f, 2.0f},
+        glm::vec3{-2.0f, -2.0f, -2.0f},
         glm::vec3{2.0f, -2.0f, 2.0f},
-        glm::vec3{-2.0f, -2.0f, 2.0f},
+        glm::vec3{2.0f, 2.0f, 2.0f},
         glm::vec3{-2.0f, 2.0f, 2.0f},
-        glm::vec3{2.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 2.0f, 0.0f},
-        glm::vec3{0.0f, 0.0f, 2.0f},
-        glm::vec3{-2.0f, 0.0f, 0.0f},
+        glm::vec3{-2.0f, -2.0f, 2.0f},
+        glm::vec3{2.0f, -0.0f, 0.0f},
         glm::vec3{0.0f, -2.0f, 0.0f},
-        glm::vec3{0.0f, 0.0f, -2.0f}
+        glm::vec3{0.0f, -0.0f, 2.0f},
+        glm::vec3{-2.0f, -0.0f, 0.0f},
+        glm::vec3{0.0f, 2.0f, 0.0f},
+        glm::vec3{0.0f, -0.0f, -2.0f}
     };
 
     static constexpr std::array hedron_vertex_data
     {
-        glm::vec3{2.0f, 2.0f, -2.0f},
         glm::vec3{2.0f, -2.0f, -2.0f},
-        glm::vec3{-2.0f, -2.0f, -2.0f},
+        glm::vec3{2.0f, 2.0f, -2.0f},
         glm::vec3{-2.0f, 2.0f, -2.0f},
-        glm::vec3{2.0f, 2.0f, 2.0f},
+        glm::vec3{-2.0f, -2.0f, -2.0f},
         glm::vec3{2.0f, -2.0f, 2.0f},
-        glm::vec3{-2.0f, -2.0f, 2.0f},
+        glm::vec3{2.0f, 2.0f, 2.0f},
         glm::vec3{-2.0f, 2.0f, 2.0f},
-        glm::vec3{3.5f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 3.5f, 0.0f},
-        glm::vec3{0.0f, 0.0f, 3.5f},
-        glm::vec3{-3.5f, 0.0f, 0.0f},
+        glm::vec3{-2.0f, -2.0f, 2.0f},
+        glm::vec3{3.5f, -0.0f, 0.0f},
         glm::vec3{0.0f, -3.5f, 0.0f},
-        glm::vec3{0.0f, 0.0f, -3.5f}
+        glm::vec3{0.0f, -0.0f, 3.5f},
+        glm::vec3{-3.5f, -0.0f, 0.0f},
+        glm::vec3{0.0f, 3.5f, 0.0f},
+        glm::vec3{0.0f, -0.0f, -3.5f}
     };
-    
+
     static constexpr std::array spikes_vertex_data
     {
-        glm::vec3{1.0f, 1.0f, -1.0f},
         glm::vec3{1.0f, -1.0f, -1.0f},
-        glm::vec3{-1.0f, -1.0f, -1.0f},
+        glm::vec3{1.0f, 1.0f, -1.0f},
         glm::vec3{-1.0f, 1.0f, -1.0f},
-        glm::vec3{1.0f, 1.0f, 1.0f},
+        glm::vec3{-1.0f, -1.0f, -1.0f},
         glm::vec3{1.0f, -1.0f, 1.0f},
-        glm::vec3{-1.0f, -1.0f, 1.0f},
+        glm::vec3{1.0f, 1.0f, 1.0f},
         glm::vec3{-1.0f, 1.0f, 1.0f},
-        glm::vec3{1.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f},
-        glm::vec3{0.0f, 0.0f, 4.5f},
-        glm::vec3{-1.0f, 0.0f, 0.0f},
+        glm::vec3{-1.0f, -1.0f, 1.0f},
+        glm::vec3{1.0f, -0.0f, 0.0f},
         glm::vec3{0.0f, -1.0f, 0.0f},
-        glm::vec3{0.0f, 0.0f, -4.5f}
+        glm::vec3{0.0f, -0.0f, 4.5f},
+        glm::vec3{-1.0f, -0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+        glm::vec3{0.0f, -0.0f, -4.5f}
     };
-    
+
     static constexpr std::array tile1_vertex_data
     {
-        glm::vec3{2.0f, 2.0f, -0.5f},
         glm::vec3{2.0f, -2.0f, -0.5f},
-        glm::vec3{-2.0f, -2.0f, -0.5f},
+        glm::vec3{2.0f, 2.0f, -0.5f},
         glm::vec3{-2.0f, 2.0f, -0.5f},
-        glm::vec3{2.0f, 2.0f, 0.5f},
+        glm::vec3{-2.0f, -2.0f, -0.5f},
         glm::vec3{2.0f, -2.0f, 0.5f},
-        glm::vec3{-2.0f, -2.0f, 0.5f},
+        glm::vec3{2.0f, 2.0f, 0.5f},
         glm::vec3{-2.0f, 2.0f, 0.5f},
-        glm::vec3{2.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 2.0f, 0.0f},
-        glm::vec3{0.0f, 0.0f, 0.5f},
-        glm::vec3{-2.0f, 0.0f, 0.0f},
+        glm::vec3{-2.0f, -2.0f, 0.5f},
+        glm::vec3{2.0f, -0.0f, 0.0f},
         glm::vec3{0.0f, -2.0f, 0.0f},
-        glm::vec3{0.0f, 0.0f, -0.5f}
+        glm::vec3{0.0f, -0.0f, 0.5f},
+        glm::vec3{-2.0f, -0.0f, 0.0f},
+        glm::vec3{0.0f, 2.0f, 0.0f},
+        glm::vec3{0.0f, -0.0f, -0.5f}
     };
 
     static constexpr std::array tile2_vertex_data
     {
-        glm::vec3{2.0f, 2.0f, -0.5f},
         glm::vec3{2.0f, -2.0f, -0.5f},
-        glm::vec3{-2.0f, -2.0f, -0.5f},
+        glm::vec3{2.0f, 2.0f, -0.5f},
         glm::vec3{-2.0f, 2.0f, -0.5f},
-        glm::vec3{2.0f, 2.0f, 0.5f},
+        glm::vec3{-2.0f, -2.0f, -0.5f},
         glm::vec3{2.0f, -2.0f, 0.5f},
-        glm::vec3{-2.0f, -2.0f, 0.5f},
+        glm::vec3{2.0f, 2.0f, 0.5f},
         glm::vec3{-2.0f, 2.0f, 0.5f},
-        glm::vec3{2.8f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 2.8f, 0.0f},
-        glm::vec3{0.0f, 0.0f, 0.5f},
-        glm::vec3{-2.8f, 0.0f, 0.0f},
+        glm::vec3{-2.0f, -2.0f, 0.5f},
+        glm::vec3{2.8f, -0.0f, 0.0f},
         glm::vec3{0.0f, -2.8f, 0.0f},
-        glm::vec3{0.0f, 0.0f, -0.5f}
+        glm::vec3{0.0f, -0.0f, 0.5f},
+        glm::vec3{-2.8f, -0.0f, 0.0f},
+        glm::vec3{0.0f, 2.8f, 0.0f},
+        glm::vec3{0.0f, -0.0f, -0.5f}
     };
+
 
     static constexpr std::array indices1_data
     {
