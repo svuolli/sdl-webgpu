@@ -13,7 +13,7 @@ static WGPUSurface SDL_Webgpu_CreateSurface_X11(
 
     WGPUSurfaceDescriptor const surface_descriptor = {
         .label = NULL,
-        .nextInChain = (WGPUChainedStruct const *)&x11_surface_descriptor,
+        .nextInChain = &x11_surface_descriptor.chain,
     };
 
     return wgpuInstanceCreateSurface(instance, &surface_descriptor);
@@ -32,7 +32,7 @@ static WGPUSurface SDL_Webgpu_CreateSurface_Wayland(
 
     WGPUSurfaceDescriptor const surface_descriptor = {
         .label = NULL,
-        .nextInChain = (WGPUChainedStruct const *)&wl_surface_descriptor,
+        .nextInChain = &wl_surface_descriptor.chain,
     };
 
     return wgpuInstanceCreateSurface(instance, &surface_descriptor);
