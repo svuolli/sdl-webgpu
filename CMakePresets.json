@@ -25,6 +25,28 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
             }
+        },
+        {
+            "name": "ReleaseCPM",
+            "description": "Default release build",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "SDL_WEBGPU_USE_CPM": "ON"
+            }
+        },
+        {
+            "name": "DebugCPM",
+            "description": "Default release build",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "SDL_WEBGPU_USE_CPM": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -35,6 +57,14 @@
         {
             "name": "Release",
             "configurePreset": "Release"
+        },
+        {
+            "name": "ReleaseCPM",
+            "configurePreset": "ReleaseCPM"
+        },
+        {
+            "name": "DebugCPM",
+            "configurePreset": "DebugCPM"
         }
     ]
 }

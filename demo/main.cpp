@@ -1,4 +1,5 @@
 #include "SDL_webgpu.h"
+#include <SDL2/SDL_main.h>
 
 #include <webgpu/webgpu.h>
 #include <SDL2/SDL.h>
@@ -1271,6 +1272,7 @@ int main(int argc, char const * argv[])
     }
     catch (std::exception const & e)
     {
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", e.what(), nullptr);
         std::cerr << "Exception caught: " << e.what() << '\n';
         return 1;
     }
