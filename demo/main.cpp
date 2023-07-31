@@ -1,4 +1,5 @@
 #include "SDL_webgpu.h"
+#include <SDL2/SDL_main.h>
 
 #include <webgpu/webgpu.h>
 #include <SDL2/SDL.h>
