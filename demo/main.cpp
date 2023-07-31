@@ -18,7 +18,7 @@
 
 namespace
 {
-static constexpr WGPUColor int_to_wgpu_color(std::uint32_t c)
+constexpr WGPUColor int_to_wgpu_color(std::uint32_t c)
 {
     auto const conv = [c](std::size_t comp)
     {
@@ -28,7 +28,7 @@ static constexpr WGPUColor int_to_wgpu_color(std::uint32_t c)
     return { conv(2), conv(1), conv(0), conv(3) };
 }
 
-static constexpr glm::vec4 int_to_glm_color(std::uint32_t c)
+constexpr glm::vec4 int_to_glm_color(std::uint32_t c)
 {
     auto const conv = [c](std::size_t comp)
     {
@@ -36,6 +36,94 @@ static constexpr glm::vec4 int_to_glm_color(std::uint32_t c)
     };
 
     return { conv(2), conv(1), conv(0), conv(3) };
+}
+
+constexpr std::ostream & operator<<(std::ostream & stream, WGPUAdapterType adapter_type)
+{
+    switch(adapter_type)
+    {
+#define WEBGPU_SDL_STREAM_ADAPTER_TYPE(TYPE) case WGPUAdapterType_##TYPE: return stream << #TYPE
+    WEBGPU_SDL_STREAM_ADAPTER_TYPE(DiscreteGPU);
+    WEBGPU_SDL_STREAM_ADAPTER_TYPE(IntegratedGPU);
+    WEBGPU_SDL_STREAM_ADAPTER_TYPE(CPU);
+    WEBGPU_SDL_STREAM_ADAPTER_TYPE(Unknown);
+    WEBGPU_SDL_STREAM_ADAPTER_TYPE(Force32);
+#undef WEBGPU_SDL_STREAM_ADAPTER_TYPE
+
+        default:
+            return
+                stream <<
+                "[unknown AdapterType (" <<
+                static_cast<std::uint32_t>(adapter_type) <<
+                ")]";
+    }
+}
+
+constexpr std::ostream & operator<<(std::ostream & stream, WGPUBackendType backend)
+{
+    switch(backend)
+    {
+#define WEBGPU_SDL_STREAM_BACKEND_TYPE(TYPE) case WGPUBackendType_##TYPE: return stream << #TYPE
+    WEBGPU_SDL_STREAM_BACKEND_TYPE(Undefined);
+    WEBGPU_SDL_STREAM_BACKEND_TYPE(Null);
+    WEBGPU_SDL_STREAM_BACKEND_TYPE(WebGPU);
+    WEBGPU_SDL_STREAM_BACKEND_TYPE(D3D11);
+    WEBGPU_SDL_STREAM_BACKEND_TYPE(D3D12);
+    WEBGPU_SDL_STREAM_BACKEND_TYPE(Metal);
+    WEBGPU_SDL_STREAM_BACKEND_TYPE(Vulkan);
+    WEBGPU_SDL_STREAM_BACKEND_TYPE(OpenGL);
+    WEBGPU_SDL_STREAM_BACKEND_TYPE(OpenGLES);
+    WEBGPU_SDL_STREAM_BACKEND_TYPE(Force32);
+#undef WEBGPU_SDL_STREAM_BACKEND_TYPE
+
+        default:
+            return
+                stream <<
+                "[unknown BackendType (" <<
+                static_cast<std::uint32_t>(backend) <<
+                ")]";
+    }
+}
+
+constexpr std::ostream & operator<<(std::ostream & stream, WGPUFeatureName feature)
+{
+    switch(feature)
+    {
+#define WEBGPU_SDL_STREAM_FEATURE(TYPE) case WGPUFeatureName_##TYPE: return stream << #TYPE
+    WEBGPU_SDL_STREAM_FEATURE(Undefined);
+    WEBGPU_SDL_STREAM_FEATURE(DepthClipControl);
+    WEBGPU_SDL_STREAM_FEATURE(Depth32FloatStencil8);
+    WEBGPU_SDL_STREAM_FEATURE(TimestampQuery);
+    WEBGPU_SDL_STREAM_FEATURE(PipelineStatisticsQuery);
+    WEBGPU_SDL_STREAM_FEATURE(TextureCompressionBC);
+    WEBGPU_SDL_STREAM_FEATURE(TextureCompressionETC2);
+    WEBGPU_SDL_STREAM_FEATURE(TextureCompressionASTC);
+    WEBGPU_SDL_STREAM_FEATURE(IndirectFirstInstance);
+    WEBGPU_SDL_STREAM_FEATURE(ShaderF16);
+    WEBGPU_SDL_STREAM_FEATURE(RG11B10UfloatRenderable);
+    WEBGPU_SDL_STREAM_FEATURE(BGRA8UnormStorage);
+    WEBGPU_SDL_STREAM_FEATURE(Float32Filterable);
+    WEBGPU_SDL_STREAM_FEATURE(DawnShaderFloat16);
+    WEBGPU_SDL_STREAM_FEATURE(DawnInternalUsages);
+    WEBGPU_SDL_STREAM_FEATURE(DawnMultiPlanarFormats);
+    WEBGPU_SDL_STREAM_FEATURE(DawnNative);
+    WEBGPU_SDL_STREAM_FEATURE(ChromiumExperimentalDp4a);
+    WEBGPU_SDL_STREAM_FEATURE(TimestampQueryInsidePasses);
+    WEBGPU_SDL_STREAM_FEATURE(ImplicitDeviceSynchronization);
+    WEBGPU_SDL_STREAM_FEATURE(SurfaceCapabilities);
+    WEBGPU_SDL_STREAM_FEATURE(TransientAttachments);
+    WEBGPU_SDL_STREAM_FEATURE(MSAARenderToSingleSampled);
+    WEBGPU_SDL_STREAM_FEATURE(DualSourceBlending);
+    WEBGPU_SDL_STREAM_FEATURE(D3D11MultithreadProtected);
+    WEBGPU_SDL_STREAM_FEATURE(Force32);
+#undef WEBGPU_SDL_STREAM_FEATURE
+
+        default:
+            return stream <<
+                "[unknown Feature (" <<
+                static_cast<std::uint32_t>(feature) <<
+                ")]";
+    }
 }
 
 std::ostream & operator<<(std::ostream & stream, WGPULimits const & limits)
@@ -1190,7 +1278,8 @@ void print_wgpu_info(wgpu_app const & app)
     std::cout << " - driverDescription: " << properties.driverDescription << '\n';
     std::cout << " - adapterType: " << properties.adapterType << '\n';
     std::cout << " - backendType: " << properties.backendType << '\n';
-    std::cout << " - compatibilityMode: " << properties.compatibilityMode << '\n';
+    std::cout << " - compatibilityMode: " <<
+        (properties.compatibilityMode ? "true" : "false") << '\n';
 
     WGPUSupportedLimits supported_limits;
     if(wgpuAdapterGetLimits(app.wgpu_adapter, &supported_limits))
