@@ -112,7 +112,7 @@ WGPUSurface SDL_Webgpu_CreateSurface(
 #endif
 
 #if defined(SDL_VIDEO_DRIVER_WINDOWS)
-        case SDL_SYSWM_COCOA:
+        case SDL_SYSWM_WINDOWS:
             return SDL_Webgpu_CreateSurface_Win32(&info, instance);
 #endif
 
