@@ -2,7 +2,7 @@ enable_language(CXX)
 
 add_executable(webgpu-demo)
 target_sources(webgpu-demo PRIVATE main.cpp)
-target_link_libraries(webgpu-demo PRIVATE SDL_webgpu)
+target_link_libraries(webgpu-demo PRIVATE SDL_webgpu glm::glm)
 set_target_properties(
     webgpu-demo PROPERTIES
     CXX_STANDARD 20
