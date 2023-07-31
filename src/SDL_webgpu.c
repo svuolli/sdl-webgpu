@@ -17,8 +17,6 @@ static WGPUSurface SDL_Webgpu_CreateSurface_Win32(
     };
 
     return wgpuInstanceCreateSurface(instance, &surface_descriptor);
-
-    return NULL;
 }
 #endif
 
@@ -90,6 +88,7 @@ static WGPUSurface SDL_Webgpu_CreateSurface_Wayland(
 WGPUSurface SDL_Webgpu_CreateSurface(
     SDL_Window * window, WGPUInstance instance)
 {
+    return NULL;
     SDL_SysWMinfo info;
     SDL_VERSION(&info.version);
 
