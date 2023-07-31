@@ -1,3 +1,4 @@
+enable_language(CXX)
 
 add_executable(webgpu-demo)
 target_sources(webgpu-demo PRIVATE main.cpp)
