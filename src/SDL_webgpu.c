@@ -1,6 +1,27 @@
 #include "SDL_webgpu.h"
 #include <SDL2/SDL_syswm.h>
 
+#if defined(SDL_VIDEO_DRIVER_WINDOWS)
+static WGPUSurface SDL_Webgpu_CreateSurface_Win32(
+    SDL_SysWMinfo * wminfo, WGPUInstance instance)
+{
+    WGPUSurfaceDescriptorFromWindowsHWND const win32_surface_descriptor = {
+        .chain = { .next = NULL, .sType = WGPUSType_SurfaceDescriptorFromWindowsHWND },
+        .hinstance = wminfo->info.win.hinstance,
+        .hwnd = wminfo->info.win.window,
+    };
+
+    WGPUSurfaceDescriptor const surface_descriptor = {
+        .label = NULL,
+        .nextInChain = &win32_surface_descriptor.chain,
+    };
+
+    return wgpuInstanceCreateSurface(instance, &surface_descriptor);
+
+    return NULL;
+}
+#endif
+
 #if defined(SDL_VIDEO_DRIVER_COCOA)
 #include <Foundation/Foundation.h>
 #include <QuartzCore/CAMetalLayer.h>
@@ -81,7 +102,7 @@ WGPUSurface SDL_Webgpu_CreateSurface(
             return SDL_Webgpu_CreateSurface_X11(&info, instance);
 #endif
 
-#if defined(SDL_VIDEO_DRIVER_X11)
+#if defined(SDL_VIDEO_DRIVER_WAYLAND)
         case SDL_SYSWM_WAYLAND:
             return SDL_Webgpu_CreateSurface_Wayland(&info, instance);
 #endif
@@ -89,6 +110,11 @@ WGPUSurface SDL_Webgpu_CreateSurface(
 #if defined(SDL_VIDEO_DRIVER_COCOA)
         case SDL_SYSWM_COCOA:
             return SDL_Webgpu_CreateSurface_Cocoa(&info, instance);
+#endif
+
+#if defined(SDL_VIDEO_DRIVER_WINDOWS)
+        case SDL_SYSWM_COCOA:
+            return SDL_Webgpu_CreateSurface_Win32(&info, instance);
 #endif
 
         default:
